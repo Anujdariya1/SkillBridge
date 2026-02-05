@@ -1,0 +1,104 @@
+📊 SkillBridge – Database Tables & Columns
+
+1️⃣ users
+Stores all users (learners + admin).
+
+Column	Type	Purpose
+id				SERIAL (PK)					Unique user ID
+name			VARCHAR					User name
+email			VARCHAR (UNIQUE)			Login email
+password_hash	TEXT							Hashed password
+role				VARCHAR					user / admin
+created_at		TIMESTAMP					Account creation time
+
+
+2️⃣ careers
+Different career paths (fields).
+
+Column	Type	Purpose
+id				SERIAL (PK)					Career ID
+name			VARCHAR					Backend Developer
+description		TEXT							Career overview
+created_at		TIMESTAMP					Created time
+
+3️⃣ skills
+All skills across all careers.
+
+Column	Type	Purpose
+id				SERIAL (PK)					Skill ID
+name			VARCHAR					SQL, APIs, Python
+category			VARCHAR					Programming / Database
+created_at		TIMESTAMP					Created time
+
+4️⃣ career_skills
+Defines the roadmap (core table).
+
+Column	Type	Purpose
+id				SERIAL (PK)					Mapping ID
+career_id			INT (FK → careers.id)			Career
+skill_id	INT (FK → skills.id)		Skill
+required_level	INT				Required level (0–3)
+priority	INT				Order in roadmap
+created_at	TIMESTAMP			Created time
+
+5️⃣ user_skills
+User’s current skill level.
+
+Column	Type	Purpose
+id				SERIAL (PK)					Record ID
+user_id			INT (FK → users.id)			User
+skill_id	INT (FK → skills.id)		Skill
+level		INT				User level (0–3)
+updated_at	TIMESTAMP			Last update
+
+6️⃣ learning_paths
+Generated path for a user.
+
+Column	Type	Purpose
+id				SERIAL (PK)					Path ID
+user_id			INT (FK → users.id)			User
+career_id	INT (FK → careers.id)		Selected career
+created_at	TIMESTAMP			Generated time
+
+7️⃣ learning_path_items
+Steps inside a learning path.
+
+Column	Type	Purpose
+id	SERIAL (PK)	Step ID
+learning_path_id	INT (FK → learning_paths.id)	Path
+skill_id	INT (FK → skills.id)	Skill
+order_index	INT	Order
+status	VARCHAR	pending / completed
+completed_at	TIMESTAMP	Completion time
+
+8️⃣ resources
+Learning resources per skill.
+
+Column	Type	Purpose
+id	SERIAL (PK)	Resource ID
+skill_id	INT (FK → skills.id)	Skill
+title	VARCHAR	Resource title
+url	TEXT	Link
+type	VARCHAR	video / article / course
+created_at	TIMESTAMP	Created time
+
+9️⃣ projects
+Mini-projects for skills.
+
+Column	Type	Purpose
+id	SERIAL (PK)	Project ID
+skill_id	INT (FK → skills.id)	Skill
+title	VARCHAR	Project name
+description	TEXT	What to build
+created_at	TIMESTAMP	Created time
+
+🔟 submissions
+User project submissions.
+
+Column	Type	Purpose
+id	SERIAL (PK)	Submission ID
+project_id	INT (FK → projects.id)	Project
+user_id	INT (FK → users.id)	User
+submission_url	TEXT	GitHub / Drive link
+status	VARCHAR	submitted / reviewed
+submitted_at	TIMESTAMP	Time
