@@ -1,8 +1,7 @@
-const {markSkillCompletedHandler, getProgressPercentageHandler} = require('../controllers/progressController');
-const authMiddleware = require('../middleware/auth');
-const router = require('express').Router();
+const router = require("express").Router();
+const authMiddleware = require("../middleware/auth");
+const { updateSkillLevelHandler } = require("../controllers/progressController");
 
-router.post('/complete', authMiddleware, markSkillCompletedHandler);
-router.get('/percentage', authMiddleware, getProgressPercentageHandler);
+router.patch("/:skillId/level", authMiddleware, updateSkillLevelHandler);
 
 module.exports = router;

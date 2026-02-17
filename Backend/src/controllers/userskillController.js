@@ -1,4 +1,4 @@
-const {upsertUserSkill, getUserSkills} = require('../services/userSkillService');
+const {upsertUserSkill, getUserSkills} = require('../db/queries');
 
 async function upsertUserSkillHandler(req, res) {
     try {

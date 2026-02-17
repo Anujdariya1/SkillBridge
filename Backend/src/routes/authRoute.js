@@ -1,3 +1,4 @@
+const express = require("express");
 const {register, login, getMe, promoteToAdminHandler} = require('../controllers/authController');
 const authMiddleware = require('../middleware/auth');
 const adminMiddleware = require('../middleware/requireAdmin');

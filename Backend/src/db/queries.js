@@ -196,53 +196,106 @@ async function createLearningPath(userId, careerId) {
 }
 
 async function generateLearningPathItems(pathId, userId, careerId) {
+  // 1️⃣ Get all career skills ordered by priority
+  const { rows: careerSkills } = await pool.query(
+    `
+    SELECT skill_id, priority
+    FROM career_skills
+    WHERE career_id = $1
+    ORDER BY priority ASC
+    `,
+    [careerId]
+  );
+
+  // 2️⃣ Insert ALL skills into learning_path_items
+  for (const skill of careerSkills) {
     await pool.query(
-        `INSERT INTO learning_path_items (learning_path_id, skill_id, order_index)
-         SELECT $1, cs.skill_id, cs.priority
-         FROM career_skills cs
-         LEFT JOIN user_skills us
-           ON us.skill_id = cs.skill_id AND us.user_id = $2
-         WHERE cs.career_id = $3
-           AND COALESCE(us.level,0) < cs.required_level`,
-        [pathId, userId, careerId]
+      `
+      INSERT INTO learning_path_items
+        (learning_path_id, skill_id, order_index, status)
+      VALUES ($1, $2, $3, 'pending')
+      `,
+      [pathId, skill.skill_id, skill.priority]
     );
-    return true;
+  }
+
+  return true;
 }
 
 async function getLearningPathItems(pathId) {
-    const { rows } = await pool.query(
-        `SELECT lpi.id, s.name, s.category, lpi.order_index, lpi.status
-         FROM learning_path_items lpi
-         JOIN skills s ON s.id = lpi.skill_id
-         WHERE lpi.learning_path_id=$1
-         ORDER BY lpi.order_index`,
-        [pathId]
-    );
-    return rows;
+  const { rows } = await pool.query(
+    `
+    SELECT
+      lpi.id,
+      lpi.skill_id AS "skillId",
+      s.name AS "skillName",
+      cs.required_level AS "requiredLevel",
+      COALESCE(us.level, 0) AS level
+    FROM learning_path_items lpi
+    JOIN skills s ON s.id = lpi.skill_id
+    JOIN career_skills cs ON cs.skill_id = s.id
+    LEFT JOIN user_skills us
+      ON us.skill_id = s.id
+     AND us.user_id = (
+        SELECT user_id FROM learning_paths WHERE id = $1
+     )
+    WHERE lpi.learning_path_id = $1
+    ORDER BY lpi.order_index ASC
+    `,
+    [pathId]
+  );
+
+  return rows;
 }
+
+async function getUserLearningPath(userId) {
+  const { rows } = await pool.query(
+    `
+    SELECT *
+    FROM learning_paths
+    WHERE user_id = $1
+    ORDER BY created_at DESC
+    LIMIT 1
+    `,
+    [userId]
+  );
+
+  return rows[0] || null;
+}
+
+
 
 // ================= PROGRESS =================
 
-async function markSkillCompleted(itemId) {
-    await pool.query(
-        `UPDATE learning_path_items
-         SET status='completed', completed_at=NOW()
-         WHERE id=$1`,
-        [itemId]
-    );
-    return true;
+async function ensureUserSkillsForPath(userId, pathId) {
+  await pool.query(
+    `
+    INSERT INTO user_skills (user_id, skill_id, level)
+    SELECT $1, lpi.skill_id, 0
+    FROM learning_path_items lpi
+    WHERE lpi.learning_path_id = $2
+    AND NOT EXISTS (
+      SELECT 1 FROM user_skills us
+      WHERE us.user_id = $1 AND us.skill_id = lpi.skill_id
+    )
+    `,
+    [userId, pathId]
+  );
 }
 
-async function getProgressPercentage(pathId) {
-    const { rows } = await pool.query(
-        `SELECT
-            COUNT(*) FILTER (WHERE status='completed') * 100.0 /
-            NULLIF(COUNT(*),0) AS progress
-         FROM learning_path_items
-         WHERE learning_path_id=$1`,
-        [pathId]
-    );
-    return rows[0].progress || 0;
+async function updateUserSkillLevel(userId, skillId, level) {
+  const { rows } = await pool.query(
+    `
+    UPDATE user_skills
+    SET level = $3,
+        updated_at = NOW()
+    WHERE user_id = $1 AND skill_id = $2
+    RETURNING *
+    `,
+    [userId, skillId, level]
+  );
+
+  return rows[0] || null;
 }
 
 // ================= RESOURCES =================
@@ -314,6 +367,55 @@ async function getMostChosenCareers() {
     return rows;
 }
 
+async function getDashboardSummary(userId) {
+  const { rows } = await pool.query(
+    `
+    SELECT
+      c.name AS career,
+
+      COALESCE(
+        ROUND(
+          SUM(us.level)::numeric /
+          NULLIF(SUM(cs.required_level), 0) * 100
+        ),
+        0
+      ) AS progress,
+
+      (
+        SELECT s.name
+        FROM learning_path_items lpi2
+        JOIN skills s ON s.id = lpi2.skill_id
+        LEFT JOIN user_skills us2
+          ON us2.skill_id = s.id
+         AND us2.user_id = $1
+        WHERE lpi2.learning_path_id = lp.id
+          AND COALESCE(us2.level, 0) < cs.required_level
+        ORDER BY lpi2.order_index
+        LIMIT 1
+      ) AS "nextSkill",
+
+      COUNT(cs.skill_id) AS "totalSkills",
+      COUNT(*) FILTER (WHERE us.level >= cs.required_level) AS "completedSkills"
+
+    FROM learning_paths lp
+    JOIN careers c ON c.id = lp.career_id
+    JOIN career_skills cs ON cs.career_id = c.id
+    LEFT JOIN user_skills us
+      ON us.skill_id = cs.skill_id
+     AND us.user_id = lp.user_id
+
+    WHERE lp.user_id = $1
+    ORDER BY lp.created_at DESC
+    LIMIT 1
+
+    GROUP BY lp.id, c.name
+    `,
+    [userId]
+  );
+
+  return rows[0] || null;
+}
+
 // ================= EXPORTS =================
 
 module.exports = {
@@ -344,9 +446,10 @@ module.exports = {
     createLearningPath,
     generateLearningPathItems,
     getLearningPathItems,
+    getUserLearningPath,
 
-    markSkillCompleted,
-    getProgressPercentage,
+    ensureUserSkillsForPath,
+    updateUserSkillLevel,
 
     addResource,
     getResourcesBySkill,
@@ -358,4 +461,6 @@ module.exports = {
 
     getTotalUsers,
     getMostChosenCareers,
+
+    getDashboardSummary,
 };

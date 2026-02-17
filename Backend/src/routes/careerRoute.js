@@ -1,12 +1,12 @@
-const {createCareer, getAllCareers, getCareerById, updateCareer, deleteCareer} = require('../controllers/careerController');
+const {createCareerHandler, getAllCareersHandler, getCareerByIdHandler, updateCareerHandler, deleteCareerHandler} = require('../controllers/careerController');
 const authMiddleware = require('../middleware/auth');
 const adminMiddleware = require('../middleware/requireAdmin');
 const router = require('express').Router();
 
-router.post('/', authMiddleware, adminMiddleware, createCareer);
-router.get('/', getAllCareers);
-router.get('/:id', getCareerById);
-router.put('/:id', authMiddleware, adminMiddleware, updateCareer);
-router.delete('/:id', authMiddleware, adminMiddleware, deleteCareer);
+router.post('/', authMiddleware, adminMiddleware, createCareerHandler);
+router.get('/', getAllCareersHandler);
+router.get('/:id', getCareerByIdHandler);
+router.put('/:id', authMiddleware, adminMiddleware, updateCareerHandler);
+router.delete('/:id', authMiddleware, adminMiddleware, deleteCareerHandler);
 
 module.exports = router;
